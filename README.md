@@ -1,2 +1,2 @@
-# utility
-standalone scripts for varied tasks
+# Utility scripts
+Standalone scripts for varied tasks
