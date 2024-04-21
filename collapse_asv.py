@@ -4,7 +4,6 @@ python collapse_asv.py [SEQTAB] [COLLAPSED_SEQTAB]
 """
 import argparse
 from collections import defaultdict
-from datetime import datetime
 from glob import glob
 import logging
 from pathlib import Path
@@ -22,7 +21,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
-        logging.FileHandler("collapse_asv.log".format(datetime.now()), mode="w"),
+        logging.FileHandler("collapse_asv.log", mode="w"),
         logging.StreamHandler()
     ]
 )
