@@ -7,7 +7,7 @@
 python collapse_asv.py [SEQTAB] [COLLAPSED_SEQTAB]
 ```
 - __input format__:  
-[SEQTAB] must be comma-separated (ASVs as columns, samples as rows, 1st column as sample names):  
+[SEQTAB] must be comma-separated (ASV as column, sample as row, sample name as 1st column):  
 (This format is typically the output of R write.csv() applied on a DADA2 seqtab object)
 ```
 ,CACGGA,ACACG,ATACCG,...    
