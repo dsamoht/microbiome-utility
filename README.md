@@ -16,3 +16,12 @@ sample_2,4,0,5,...
 sample_3,1,6,78,...    
 ...
 ```
+## [fasta_sampler.py](https://github.com/dsamoht/utility/blob/main/fasta_sampler.py)
+- __info__: This script samples a fasta file from a list of headers given in entry.
+- __usage__:
+```
+python fasta_sampler.py [FASTA] [HEADERS] > [SAMPLED_FASTA]
+```
+- __input format__:  
+[FASTA] : standard fasta  
+[HEADERS] : file with 1 header of interest per line (with or without ">")
