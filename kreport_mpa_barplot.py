@@ -2,7 +2,8 @@
 
 """
 usage:
-python kreport_mpa_barplot.py [KREPORT_MPA] [COLLAPSED_SEQTAB]
+python kreport_mpa_barplot.py --input [KREPORT_MPA] --barplot_relative_to_all --tax-level [p/c/o/f/g/s] --top_n [INT]
+python kreport_mpa_barplot.py --input [KREPORT_MPA] --barplot_relative_to_parent --tax_name [STRING] --tax-level [p/c/o/f/g/s] --top_n [INT]
 """
 import argparse
 
