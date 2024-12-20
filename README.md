@@ -5,7 +5,7 @@
   2. KrakenTools' combine_mpa.py
 - __dependencies__: pandas, matplotlib, scipy  
 - __info__: This script can produce 2 types of stacked barplots from Kraken classification reports:  
-  1. Top *n* taxa at a specific taxonomic level relative to all classified sequences (ex: barplot of top 10 *Cyanobacteria* phyla)
+  1. Top *n* taxa at a specific taxonomic level relative to all classified sequences (ex: barplot of top 10 phyla)
   2. Top *n* taxa at a specific taxonomic level relative to a parent taxa (ex: barplot of top 10 cyanobacterial genus inside the *Cyanobacteria* phylum)
 - __usage__:
 ```
