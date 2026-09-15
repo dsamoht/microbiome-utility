@@ -18,8 +18,8 @@ python kreport_mpa_barplot.py --input [KREPORT_MPA] --barplot_relative_to_parent
 
 
 ## [collapse_asv.py](https://github.com/dsamoht/utility/blob/main/collapse_asv.py)
-- __dependencies__: pandas, [cdhit](https://github.com/weizhongli/cdhit)  
-- __info__: This script aims to speed up DADA2's `collapseNoMismatch` by using `cd-hit-est` with 100% identity clustering. ASVs of different lengths but of 100% identity on the shorter sequence are collapsed (summed). The most abundant ASV across samples is kept as the representative.  
+- __dependencies__: pandas 
+- __info__: This script aims to speed up DADA2's `collapseNoMismatch` by using python string matching. ASVs of different lengths but of 100% identity on the shorter sequence are collapsed (summed). The most abundant ASV across samples is kept as the representative.  
 - __usage__:
 ```
 python collapse_asv.py [SEQTAB] [COLLAPSED_SEQTAB]
