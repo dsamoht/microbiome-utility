@@ -1,160 +1,152 @@
 #!/usr/bin/env python3
 
 """
-usage:
-python kreport_mpa_barplot.py --input [KREPORT_MPA] --barplot_relative_to_all --tax-level [p/c/o/f/g/s] --top_n [INT]
-python kreport_mpa_barplot.py --input [KREPORT_MPA] --barplot_relative_to_parent --tax_name [STRING] --tax-level [p/c/o/f/g/s] --top_n [INT]
+Usage:
+python kreport_mpa_barplot.py -i [KREPORT_MPA] -l [p/c/o/f/g/s] -n [INT]
+python kreport_mpa_barplot.py -i [KREPORT_MPA] -l [p/c/o/f/g/s] -n [INT] -p [PARENT_TAXA_STRING]
+
+Examples:
+Plot top 15 phyla across all communities:
+ -> python kreport_mpa_barplot.py -i kraken_mpa.tsv -l p -n 15
+
+Plot top 5 orders within Cyanobacteria:
+ -> python kreport_mpa_barplot.py -i kraken_mpa.tsv -l o -n 5 -p p__Cyanobacteria
 """
 import argparse
+import sys
 
 from matplotlib import pyplot as plt
 import pandas as pd
 import scipy.cluster.hierarchy as sch
 import scipy.spatial.distance as spdist
 
-
 __author__ = "deschenes.thomas@gmail.com"
 
-# source : https://sashamaps.net/docs/resources/20-colors/
 DISTINCT_COLORS = ['#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
                    '#911eb4', '#42d4f4', '#f032e6', '#bfef45', '#fabed4',
                    '#469990', '#dcbeff', '#9A6324', '#fffac8', '#800000',
                    '#aaffc3', '#808000', '#ffd8b1', '#000075', '#a9a9a9',
                    '#000000']
 
-def barplot_relative_to_all(taxa_level, top_n, taxa_table):
+def format_taxa_name(lineage_str, target_level, parent_str=None):
     """
-    Stacked barplot of the relative abundance of `top_n` `taxa_level`
-    `taxa_table`
-    
-    ex: Usage for a stacked barplot of top 15 phylum:
-     -> barplot_relative_to_all('p', 15, kraken_mpa_table)
+    Cleans up the Kraken MPA lineage string for the legend.
+    Italicizes Genus ('g') and Species ('s') using Matplotlib's math text rendering.
     """
-    
+    if lineage_str == "Others":
+        return "Others"
+
+    nodes = lineage_str.split("|")
+    target_node = next((n for n in nodes if n.startswith(f"{target_level}__")), None)
+
+    if not target_node:
+        return lineage_str
+
+    target_name = target_node.split("__")[1].replace("_", " ")
+
+    # Italicize Genus and Species conventions
+    if target_level in ['g', 's']:
+        target_name = f"$\\mathit{{{target_name}}}$"
+
+    if parent_str:
+        parent_level, parent_name = parent_str.split("__")
+        parent_name = parent_name.replace("_", " ")
+        if parent_level in ['g', 's']:
+            parent_name = f"$\\mathit{{{parent_name}}}$"
+        return f"{parent_name} | {target_name}"
+
+    return target_name
+
+
+def plot_stacked_barplot(tax_level_table, title, top_n, taxa_level, taxa_table, parent_name=None):
+    """
+    Shared plotting logic for clustering and generating the stacked barplot.
+    """
     fig, (ax_1, ax_2) = plt.subplots(2, 1, figsize=(16, 8), gridspec_kw={'height_ratios': [1, 0.3], 'hspace': 0.6})
-    
-    tax_level_table = taxa_table.loc[[str(i) for i in taxa_table.index if str(i).split("|")[-1].startswith(f"{taxa_level}__")]]
-    
+
     # Hierarchical clustering of samples based on Bray-Curtis distance
     dist_matrix = spdist.pdist(taxa_table.T, metric='braycurtis')
-    linkage_matrix = sch.linkage(dist_matrix, method='complete', optimal_ordering=True)    
-    
+    linkage_matrix = sch.linkage(dist_matrix, method='complete', optimal_ordering=True)
+
     dendro = sch.dendrogram(linkage_matrix,
-                        orientation='bottom',
-                        ax=ax_2,
-                        no_labels=True,
-                        color_threshold=False,
-                        link_color_func=lambda x:'k')
-    
+                            orientation='bottom',
+                            ax=ax_2,
+                            no_labels=True,
+                            color_threshold=False,
+                            link_color_func=lambda x:'k')
+
     # Get the top_n rows by sum
     top_n_by_sum = tax_level_table.loc[tax_level_table.sum(axis=1).nlargest(top_n).index]
-    others_row = (taxa_table.loc['x__cellular_organisms'] + taxa_table.loc['d__Viruses'])  - top_n_by_sum.sum()
-    result_df = pd.concat([top_n_by_sum, pd.DataFrame(others_row).T.rename(index={0: 'Others'})])
-    
-    tax_level_table = result_df / result_df.sum()
-    tax_level_table.index = ["|".join([j for j in i.split("|") if "x__" not in j]) for i in tax_level_table.index]
-    tax_level_table = tax_level_table.T.iloc[dendro['leaves']]
-    
-    tax_level_table.plot(kind='bar', stacked=True, legend=False, color=DISTINCT_COLORS, ax=ax_1, edgecolor='k', width=0.8)    
-    ax_2.set_axis_off()
-    ax_2.set_line_color = 'black'
-    ax_1.set_ylabel('Relative abundance')
-    ax_1.legend(
-            loc='center left', 
-            bbox_to_anchor=(1, 0.5), 
-            title=''
-        )
-    fig.suptitle(f"Relative abundance of top {top_n} {taxa_level}")
-    fig.subplots_adjust(right=0.4)
-    plt.tight_layout()
-    plt.show()
 
-def barplot_relative_to_parent(taxon_name, taxa_level, top_n, taxa_table):
-    
-    """
-    Stacked barplot of `top_n` `division` inside `taxon_name`
-    
-    ex: Usage for a stacked barplot of top 5 Cyanobacterial orders:
-     -> barplot_relative('p__Cyanobacteria', 'o', 5, kraken_mpa_table)
-    """
-    
-    fig, (ax_1, ax_2) = plt.subplots(2, 1, figsize=(16, 8), gridspec_kw={'height_ratios': [1, 0.3], 'hspace': 0.6})
-    tax_level_table = taxa_table.loc[[str(i) for i in taxa_table.index if taxon_name in str(i) and i.split("|")[-1].startswith(f"{taxa_level}")]]
-  
-    top_n_by_sum = tax_level_table.loc[tax_level_table.sum(axis=1).nlargest(top_n).index]
-    others_row = tax_level_table.loc[~tax_level_table.index.isin(top_n_by_sum.index)].sum()
+    # Calculate 'Others'
+    if parent_name is None:
+        # Relative to all
+        cellular = taxa_table.loc['x__cellular_organisms'] if 'x__cellular_organisms' in taxa_table.index else 0
+        viruses = taxa_table.loc['d__Viruses'] if 'd__Viruses' in taxa_table.index else 0
+        others_row = (cellular + viruses) - top_n_by_sum.sum()
+    else:
+        # Relative to parent
+        others_row = tax_level_table.loc[~tax_level_table.index.isin(top_n_by_sum.index)].sum()
+
     result_df = pd.concat([top_n_by_sum, pd.DataFrame(others_row).T.rename(index={0: 'Others'})])
-    
-    tax_level_table = result_df / result_df.sum()
-    tax_level_table.index = ["|".join([j for j in i.split("|") if "x__" not in j]) for i in tax_level_table.index]
-    
-    tax_level_table.T.plot(kind='bar', stacked=True, legend=False, color=DISTINCT_COLORS, ax=ax_1, edgecolor='k', width=0.8)    
+
+    rel_abundance_table = result_df / result_df.sum()
+
+    rel_abundance_table.index = [format_taxa_name(i, taxa_level, parent_name) for i in rel_abundance_table.index]
+
+    rel_abundance_table = rel_abundance_table.T.iloc[dendro['leaves']]
+
+    rel_abundance_table.plot(kind='bar', stacked=True, legend=False, color=DISTINCT_COLORS, ax=ax_1, edgecolor='k', width=0.8)
+
+    n_samples = len(rel_abundance_table.index)
+    ax_1.set_xlim(-0.5, n_samples - 0.5)
+    ax_2.set_xlim(0, 10 * n_samples)
+
     ax_2.set_axis_off()
-    ax_2.set_line_color = 'black'
     ax_1.set_ylabel('Relative abundance')
-    ax_1.legend(
-            loc='center left', 
-            bbox_to_anchor=(1, 0.5), 
-            title=''
-        )
-    fig.suptitle(f"Relative abundance of top {top_n} {taxon_name} at {taxa_level} level")
+    ax_1.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='')
+
+    fig.suptitle(title)
     fig.subplots_adjust(right=0.4)
     plt.tight_layout()
     plt.show()
 
 
 def main():
-
     TAX_LEVELS_MAP = {'p': 6, 'c': 5, 'o': 4, 'f': 3, 'g': 2, 's': 1}
     PREFIXES = ["p__", "c__", "o__", "f__", "g__", "s__"]
 
-    parser = argparse.ArgumentParser(description="A script to produce stacked barplot of microboal communities.")
-    
-    parser.add_argument("--input", type=str, required=True, help="Input Kraken MPA (MetaPhlAn format) file.")
-
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument('--barplot_relative_to_all', action='store_true',
-                       help="Barplot relative to all. Requires --tax-level and --top_n.")
-    group.add_argument('--barplot_relative_to_parent', action='store_true',
-                       help="Barplot relative to a parent. Requires --tax-name, --tax-level and --top_n.")
-    
-    parser.add_argument('--tax_name', type=str, help="Specify the exact name of the parent taxa (ex: p__Cyanobacteria).")
-    parser.add_argument('--tax_level', type=str, help="Specify the taxonomic level [p/c/o/f/g/s].")
-    parser.add_argument('--top_n', type=int, help="Specify the top N taxa to display in colors (max 20).")
+    parser = argparse.ArgumentParser(description="Produce stacked barplots of microbial communities from a Kraken MPA report.")
+    parser.add_argument("-i", "--input", type=str, required=True, help="Input Kraken MPA (MetaPhlAn format) file.")
+    parser.add_argument("-l", "--level", type=str, required=True, choices=TAX_LEVELS_MAP.keys(), help="Target taxonomic level (p/c/o/f/g/s).")
+    parser.add_argument("-n", "--top", type=int, default=10, help="Top N taxa to display in colors (max 20).")
+    parser.add_argument("-p", "--parent", type=str, default=None, help="Optional exact name of parent taxa (e.g., p__Cyanobacteria).")
 
     args = parser.parse_args()
 
-    main_df = pd.read_csv(args.input, sep="\t", index_col=0)
+    if args.top > 20:
+        parser.error("--top must be maximum 20 due to color palette limitations.")
 
-    if args.tax_level:
-        if args.tax_level not in TAX_LEVELS_MAP:
-            parser.error("--tax_level must be one of the following: p, c, o, f, g, s.")
+    if args.parent:
+        if not any(args.parent.startswith(prefix) for prefix in PREFIXES):
+            parser.error("--parent must start with a valid prefix: p__, c__, o__, f__, g__, s__.")
+        if TAX_LEVELS_MAP[args.parent.split("__")[0]] <= TAX_LEVELS_MAP[args.level]:
+            parser.error(f"--level ({args.level}) must be a lower rank than --parent ({args.parent.split('__')[0]}).")
 
-    if args.tax_name:
-        if not any(args.tax_name.startswith(prefix) for prefix in PREFIXES):
-            parser.error("--tax_name must start with one of the following prefixes: p__, c__, o__, f__, g__, s__.")
+    try:
+        main_df = pd.read_csv(args.input, sep="\t", index_col=0)
+    except FileNotFoundError:
+        print(f"Error: Could not find file {args.input}")
+        sys.exit(1)
 
-    if args.top_n:
-        if args.top_n > 20:
-            parser.error("--top_n must be max. 20.")
-
-    if args.barplot_relative_to_all:
-        if not args.tax_level or not args.top_n:
-            parser.error("--barplot_relative_to_all requires --tax_level and --top_n.")
-    
-    if args.barplot_relative_to_parent:
-        if not args.tax_name or not args.tax_level or not args.top_n:
-            parser.error("--barplot_relative_to_parent requires --tax_name, --tax_level and --top_n.")
-
-        if args.tax_name and args.tax_level:
-            if TAX_LEVELS_MAP[args.tax_name.split("__")[0]] <= TAX_LEVELS_MAP[args.tax_level]:
-                parser.error("--tax_level must be an inferior rank than --tax_name.")
-
-    if args.barplot_relative_to_all:
-        barplot_relative_to_all(args.tax_level, args.top_n, main_df)
-
-    if args.barplot_relative_to_parent:
-        barplot_relative_to_parent(args.tax_name, args.tax_level, args.top_n, main_df) 
+    if args.parent:
+        tax_level_table = main_df.loc[[str(i) for i in main_df.index if args.parent in str(i) and str(i).split("|")[-1].startswith(args.level)]]
+        title = f"Relative abundance of top {args.top} {args.level}-level taxa in {args.parent.split('__')[1]}"
+        plot_stacked_barplot(tax_level_table, title, args.top, args.level, main_df, parent_name=args.parent)
+    else:
+        tax_level_table = main_df.loc[[str(i) for i in main_df.index if str(i).split("|")[-1].startswith(f"{args.level}__")]]
+        title = f"Relative abundance of top {args.top} taxa at level '{args.level}'"
+        plot_stacked_barplot(tax_level_table, title, args.top, args.level, main_df, parent_name=None)
 
 
 if __name__ == "__main__":
