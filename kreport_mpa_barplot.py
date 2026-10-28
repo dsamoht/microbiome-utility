@@ -28,32 +28,26 @@ DISTINCT_COLORS = ['#e6194B', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
                    '#aaffc3', '#808000', '#ffd8b1', '#000075', '#a9a9a9',
                    '#000000']
 
-def format_taxa_name(lineage_str, target_level, parent_str=None):
+# Width (in inches) allotted to each sample, so bars keep the same size whatever the number of samples
+SAMPLE_WIDTH = 0.3
+
+def format_taxa_name(lineage_str, target_level):
     """
-    Cleans up the Kraken MPA lineage string for the legend.
+    Reduces the Kraken MPA lineage string to the target taxon name for the legend.
     Italicizes Genus ('g') and Species ('s') using Matplotlib's math text rendering.
     """
     if lineage_str == "Others":
         return "Others"
 
-    nodes = lineage_str.split("|")
-    target_node = next((n for n in nodes if n.startswith(f"{target_level}__")), None)
-
-    if not target_node:
+    target_node = lineage_str.split("|")[-1]
+    if not target_node.startswith(f"{target_level}__"):
         return lineage_str
 
-    target_name = target_node.split("__")[1].replace("_", " ")
+    target_name = target_node.split("__", 1)[1].replace("_", " ")
 
-    # Italicize Genus and Species conventions
+    # Italicize Genus and Species conventions (escape spaces, which math text drops)
     if target_level in ['g', 's']:
-        target_name = f"$\\mathit{{{target_name}}}$"
-
-    if parent_str:
-        parent_level, parent_name = parent_str.split("__")
-        parent_name = parent_name.replace("_", " ")
-        if parent_level in ['g', 's']:
-            parent_name = f"$\\mathit{{{parent_name}}}$"
-        return f"{parent_name} | {target_name}"
+        target_name = "$\\mathit{" + target_name.replace(" ", "\\ ") + "}$"
 
     return target_name
 
@@ -62,7 +56,10 @@ def plot_stacked_barplot(tax_level_table, title, top_n, taxa_level, taxa_table, 
     """
     Shared plotting logic for clustering and generating the stacked barplot.
     """
-    fig, (ax_1, ax_2) = plt.subplots(2, 1, figsize=(16, 8), gridspec_kw={'height_ratios': [1, 0.3], 'hspace': 0.6})
+    # Constrained layout keeps both panels the same width (leaves under xticks) and packs them tightly
+    n_samples = taxa_table.shape[1]
+    fig, (ax_1, ax_2) = plt.subplots(2, 1, figsize=(n_samples * SAMPLE_WIDTH + 4, 8), layout='constrained', gridspec_kw={'height_ratios': [1, 0.3]})
+    fig.get_layout_engine().set(h_pad=0.15, hspace=0)
 
     # Hierarchical clustering of samples based on Bray-Curtis distance
     dist_matrix = spdist.pdist(taxa_table.T, metric='braycurtis')
@@ -92,23 +89,28 @@ def plot_stacked_barplot(tax_level_table, title, top_n, taxa_level, taxa_table, 
 
     rel_abundance_table = result_df / result_df.sum()
 
-    rel_abundance_table.index = [format_taxa_name(i, taxa_level, parent_name) for i in rel_abundance_table.index]
+    rel_abundance_table.index = [format_taxa_name(i, taxa_level) for i in rel_abundance_table.index]
 
     rel_abundance_table = rel_abundance_table.T.iloc[dendro['leaves']]
 
     rel_abundance_table.plot(kind='bar', stacked=True, legend=False, color=DISTINCT_COLORS, ax=ax_1, edgecolor='k', width=0.8)
 
-    n_samples = len(rel_abundance_table.index)
     ax_1.set_xlim(-0.5, n_samples - 0.5)
     ax_2.set_xlim(0, 10 * n_samples)
 
     ax_2.set_axis_off()
     ax_1.set_ylabel('Relative abundance')
-    ax_1.legend(loc='center left', bbox_to_anchor=(1, 0.5), title='')
+    # Reverse legend order so it matches the top-to-bottom stacking of the bars
+    handles, labels = ax_1.get_legend_handles_labels()
+    ax_1.legend(handles[::-1], labels[::-1], loc='center left', bbox_to_anchor=(1, 0.5), frameon=False)
 
-    fig.suptitle(title)
-    fig.subplots_adjust(right=0.4)
-    plt.tight_layout()
+    ax_1.set_title(title)
+
+    # Resize the figure so the plotting area is exactly n_samples * SAMPLE_WIDTH wide (legend width varies with labels)
+    fig.canvas.draw()
+    ax_width = ax_1.get_position().width * fig.get_figwidth()
+    fig.set_figwidth(fig.get_figwidth() + n_samples * SAMPLE_WIDTH - ax_width)
+
     plt.show()
 
 

@@ -1,6 +1,6 @@
-## Varied scripts for varied tasks - from file formatting to data visualization
+## varied scripts for varied bioinformatics tasks in microbiome study, in no particular order
 ## [kreport_mpa_barplot.py](https://github.com/dsamoht/utility/blob/main/kreport_mpa_barplot.py)
-- __info__: This script can produce 2 types of stacked barplots from Kraken classification reports:  
+- __info__: This script can produce 2 types of stacked barplots from Kraken classification reports and also plot dendrogram based on Bray-Curtis distance:  
   1. Top *n* taxa at a specific taxonomic level relative to all classified sequences (ex: barplot of top 10 phyla)
   2. Top *n* taxa at a specific taxonomic level relative to a parent taxa (ex: barplot of top 10 cyanobacterial genus inside the *Cyanobacteria* phylum)
 - __input__: multiple kraken reports merged into a single table via 2 commands:  
@@ -9,10 +9,19 @@
 - __dependencies__: pandas, matplotlib, scipy  
 - __usage__:
 ```
-python kreport_mpa_barplot.py --input [KREPORT_MPA] --barplot_relative_to_all --tax-level [p/c/o/f/g/s] --top_n [INT]
-python kreport_mpa_barplot.py --input [KREPORT_MPA] --barplot_relative_to_parent --tax_name [STRING] --tax-level [p/c/o/f/g/s] --top_n [INT]
+python kreport_mpa_barplot.py -i [KREPORT_MPA] -l [p/c/o/f/g/s] -n [INT]
+python kreport_mpa_barplot.py -i [KREPORT_MPA] -l [p/c/o/f/g/s] -n [INT] -p [PARENT_TAXA_STRING]
 ```
-- __example__: Top 15 classes relative to all classified sequences
+  - `-i/--input`: combined Kraken MPA table
+  - `-l/--level`: target taxonomic level (p/c/o/f/g/s)
+  - `-n/--top`: number of top taxa to display in colors (default 10, max 20)
+  - `-p/--parent`: optional parent taxa (ex: `p__Cyanobacteriota`); abundances are then relative to that parent
+
+  Plot top 5 orders within Cyanobacteria:
+```
+python kreport_mpa_barplot.py -i kraken_mpa.tsv -l o -n 5 -p p__Cyanobacteriota
+```
+- __example__: Top 15 prokaryotic phyla (input filtered to Bacteria and Archaea)
 ![alt text](img/barplot_example.png)
 
 
